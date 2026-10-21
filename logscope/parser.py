@@ -121,10 +121,19 @@ def parse_line(raw: str) -> LogEntry | None:
     if not message:
         return None
 
+    # Parse timestamp directly from captured groups to avoid the overhead of
+    # datetime.strptime (which is ~10× slower than direct integer conversion
+    # for 2M+ lines and is the dominant bottleneck on large files).
     try:
-        timestamp = datetime.datetime.strptime(
-            f"{match.group('date')} {match.group('time')}",
-            "%Y-%m-%d %H:%M:%S",
+        date_str = match.group("date")   # "YYYY-MM-DD"
+        time_str = match.group("time")   # "HH:MM:SS"
+        timestamp = datetime.datetime(
+            int(date_str[0:4]),   # year
+            int(date_str[5:7]),   # month
+            int(date_str[8:10]),  # day
+            int(time_str[0:2]),   # hour
+            int(time_str[3:5]),   # minute
+            int(time_str[6:8]),   # second
         )
     except ValueError:
         return None
