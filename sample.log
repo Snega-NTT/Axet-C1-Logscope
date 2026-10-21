@@ -1,0 +1,16 @@
+2026-10-01 08:58:10 INFO Application starting
+2026-10-01 09:00:00 INFO Configuration loaded
+2026-10-01 09:01:12 WARN Cache response was slow
+2026-10-01 09:02:30 ERROR Database connection refused
+2026-10-01 09:03:15 ERROR Database connection refused
+2026-10-01 09:07:42 INFO Retrying database connection
+this is a malformed log line
+2026-10-01 09:16:05 ERROR Request timed out
+2026-10-01 09:17:20 WARN High memory usage detected
+2026-10-01 09:29:59 ERROR Database connection refused
+2026-10-01 09:30:01 INFO Background job completed
+2026-13-01 09:31:00 ERROR Invalid timestamp line
+2026-10-01 09:35:20 ERROR Request timed out
+2026-10-01 09:45:00 INFO Application healthy
+2026-10-01 09:50:00 DEBUG This level is unsupported
+2026-10-01 09:55:00 WARN
