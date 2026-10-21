@@ -6,7 +6,12 @@ Command-line entry point for LogScope.
 Dispatch table:
     summary   →  logscope.commands.summary.run_summary
     timeline  →  logscope.commands.timeline.run_timeline
-    grep      →  logscope.commands.grep.run_grep
+    grep      →  logscope.commands.grep.run_grep / iter_grep
+
+Output formats supported by every command:
+    (default)   human-readable terminal text
+    --format json   valid JSON to stdout; nothing else on stdout
+    --format md     Markdown report file written; path printed to stdout
 
 Usage:
     python -m logscope summary  <logfile> [--format json|md]
@@ -22,15 +27,21 @@ import pathlib
 import sys
 
 from logscope.commands.grep import (
-    GrepResult,
     InvalidLevelError,
     InvalidSinceError,
+    iter_grep,
     run_grep,
     validate_level,
     parse_since,
 )
 from logscope.commands.summary import run_summary
 from logscope.commands.timeline import InvalidBucketError, parse_bucket, run_timeline
+from logscope.output.json_fmt import (
+    print_grep_json,
+    print_summary_json,
+    print_timeline_json,
+)
+from logscope.output.markdown import write_grep_md, write_summary_md, write_timeline_md
 from logscope.output.terminal import print_grep_footer, print_summary, print_timeline
 
 
@@ -52,7 +63,7 @@ def _build_parser() -> argparse.ArgumentParser:
         dest="fmt",
         choices=["json", "md"],
         default=None,
-        help="Output format (default: terminal text).",
+        help="Output format: json or md (default: terminal text).",
     )
 
     # ------------------------------------------------------------------
@@ -75,7 +86,7 @@ def _build_parser() -> argparse.ArgumentParser:
         dest="fmt",
         choices=["json", "md"],
         default=None,
-        help="Output format (default: terminal text).",
+        help="Output format: json or md (default: terminal text).",
     )
 
     # ------------------------------------------------------------------
@@ -105,14 +116,14 @@ def _build_parser() -> argparse.ArgumentParser:
         dest="fmt",
         choices=["json", "md"],
         default=None,
-        help="Output format (default: terminal text).",
+        help="Output format: json or md (default: terminal text).",
     )
 
     return parser
 
 
 def _resolve_log_path(log_path: pathlib.Path) -> None:
-    """Print an error and exit(1) if log_path is not a readable file."""
+    """Print an error to stderr and exit(1) if log_path is not a readable file."""
     if not log_path.exists():
         print(f"logscope: error: file not found: {log_path}", file=sys.stderr)
         sys.exit(1)
@@ -139,9 +150,14 @@ def main(argv: list[str] | None = None) -> None:
 
         if args.fmt is None:
             print_summary(result)
-        else:
-            print(f"logscope: --format {args.fmt} not yet implemented", file=sys.stderr)
-            sys.exit(1)
+        elif args.fmt == "json":
+            print_summary_json(result)
+        elif args.fmt == "md":
+            try:
+                write_summary_md(result)
+            except OSError as exc:
+                print(f"logscope: error writing report: {exc}", file=sys.stderr)
+                sys.exit(1)
 
     # ------------------------------------------------------------------
     # timeline
@@ -163,15 +179,19 @@ def main(argv: list[str] | None = None) -> None:
 
         if args.fmt is None:
             print_timeline(result)
-        else:
-            print(f"logscope: --format {args.fmt} not yet implemented", file=sys.stderr)
-            sys.exit(1)
+        elif args.fmt == "json":
+            print_timeline_json(result)
+        elif args.fmt == "md":
+            try:
+                write_timeline_md(result)
+            except OSError as exc:
+                print(f"logscope: error writing report: {exc}", file=sys.stderr)
+                sys.exit(1)
 
     # ------------------------------------------------------------------
     # grep
     # ------------------------------------------------------------------
     elif args.command == "grep":
-        # Validate filters before touching the file.
         level_filter = None
         since_filter = None
 
@@ -192,15 +212,42 @@ def main(argv: list[str] | None = None) -> None:
         _resolve_log_path(args.logfile)
 
         try:
-            result = run_grep(args.logfile, level_filter, since_filter)
+            if args.fmt is None:
+                result = run_grep(args.logfile, level_filter, since_filter)
+                print_grep_footer(result)
+
+            elif args.fmt == "json":
+                print_grep_json(args.logfile, level_filter, since_filter)
+
+            elif args.fmt == "md":
+                # Collect entries for the Markdown table (bounded: only
+                # matched entries, not the whole file).
+                entries = []
+                malformed_lines = 0
+                match_count = 0
+                for item in iter_grep(args.logfile, level_filter, since_filter):
+                    if item is None:
+                        malformed_lines += 1
+                    else:
+                        entries.append({
+                            "timestamp": item.timestamp.isoformat(),
+                            "level":     item.level,
+                            "message":   item.message,
+                            "raw":       item.raw,
+                        })
+                        match_count += 1
+
+                from logscope.commands.grep import GrepResult
+                result = GrepResult(
+                    match_count=match_count,
+                    malformed_lines=malformed_lines,
+                    level_filter=level_filter,
+                    since_filter=since_filter,
+                )
+                write_grep_md(result, entries)
+
         except OSError as exc:
             print(f"logscope: error: {exc}", file=sys.stderr)
-            sys.exit(1)
-
-        if args.fmt is None:
-            print_grep_footer(result)
-        else:
-            print(f"logscope: --format {args.fmt} not yet implemented", file=sys.stderr)
             sys.exit(1)
 
 
