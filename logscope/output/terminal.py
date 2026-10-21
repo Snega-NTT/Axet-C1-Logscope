@@ -13,6 +13,7 @@ import datetime
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from logscope.commands.grep import GrepResult
     from logscope.commands.summary import SummaryResult
     from logscope.commands.timeline import TimelineResult
 
@@ -149,3 +150,26 @@ def print_timeline(result: TimelineResult) -> None:
     print(f"{'Malformed lines':<{_LABEL_WIDTH}}{result.malformed_lines}")
     print()
 
+
+# ---------------------------------------------------------------------------
+# Grep formatter
+# ---------------------------------------------------------------------------
+
+
+def print_grep_footer(result: GrepResult) -> None:
+    """Print the grep summary footer to stdout.
+
+    The matched log lines themselves are written directly by
+    ``run_grep`` as they are found; this function prints the
+    trailing counters block.
+
+    Example output::
+
+        ------------------------------------------------
+        Matches               5
+        Malformed lines       4
+    """
+    print("-" * 48)
+    print(f"{'Matches':<{_LABEL_WIDTH}}{result.match_count}")
+    print(f"{'Malformed lines':<{_LABEL_WIDTH}}{result.malformed_lines}")
+    print()
